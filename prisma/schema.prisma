@@ -1,0 +1,157 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  //output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TestStatus {
+  draft
+  published
+  archived
+}
+
+enum TestShowResults {
+  immediate
+  adminOnly
+  both
+}
+
+enum TestAuthMode {
+  freeForAll
+  registrationRequired
+  exclusiveParticipants
+}
+
+
+model Organization {
+  id             String      @id @default(uuid())
+  name           String
+  description    String?
+  website        String?
+  contactEmail   String
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  users          User[]
+  tests          Test[]
+  subscriptions  Subscription[]
+}
+
+model User {
+  id             String   @id    // Clerk user ID
+  email          String
+  firstName      String?
+  lastName       String?
+  role           String   @default("member") // "admin", "member"
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  organizationId String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  tests          Test[]   @relation("CreatorTests")
+  uploads        Upload[]
+}
+
+model PricingTier {
+  id                        Int       @id @default(autoincrement())
+  name                      String    @unique
+  maxQuestionsPerTest       Int
+  maxTestsPerMonth          Int
+  maxParticipantsPerTest    Int
+  aiGenerationEnabled       Boolean   @default(false)
+  pricePerMonth             Float
+  subscriptions             Subscription[]
+}
+
+model Subscription {
+  id              String         @id @default(uuid())
+  organization    Organization   @relation(fields: [organizationId], references: [id])
+  organizationId  String
+  pricingTier     PricingTier    @relation(fields: [pricingTierId], references: [id])
+  pricingTierId   Int
+  startDate       DateTime
+  endDate         DateTime?
+  isActive        Boolean        @default(true)
+  createdAt       DateTime       @default(now())
+}
+
+model Test {
+  id              String         @id @default(uuid())
+  title           String
+  description     String?
+  testCode        String         @unique
+  authMode        TestAuthMode   @default(freeForAll)
+  showResults     TestShowResults  @default(immediate)
+  timeLimit       Int?
+  allowRetakes    Boolean        @default(true)
+  shuffleQuestions Boolean       @default(false)
+  isPrivate       Boolean        @default(false)
+  status          TestStatus     @default(draft)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  organization    Organization?  @relation(fields: [organizationId], references: [id])
+  organizationId  String?
+  creator         User           @relation("CreatorTests", fields: [creatorId], references: [id])
+  creatorId       String
+  questions       Question[]
+  participants    Participant[]
+}
+
+model Question {
+  id              String      @id @default(uuid())
+  test            Test        @relation(fields: [testId], references: [id])
+  testId          String
+  type            String
+  question        String
+  options         Json?
+  correctAnswers  Json?
+  visibility      Json?
+  timeLimit       Int?
+  orderIndex      Int
+  points          Int         @default(1)
+  createdAt       DateTime    @default(now())
+  responses       Response[]
+}
+
+model Participant {
+  id             String       @id @default(uuid())
+  test           Test         @relation(fields: [testId], references: [id])
+  testId         String
+  email          String
+  fullName       String?
+  uniqueId       String?
+  registered     Boolean      @default(false)
+  responses      Response[]
+  createdAt      DateTime     @default(now())
+}
+
+model Response {
+  id             String      @id @default(uuid())
+  participant    Participant @relation(fields: [participantId], references: [id])
+  participantId  String
+  question       Question    @relation(fields: [questionId], references: [id])
+  questionId     String
+  answer         Json?
+  isCorrect      Boolean?
+  submittedAt    DateTime    @default(now())
+}
+
+model Upload {
+  id            String   @id @default(uuid())
+  user          User     @relation(fields: [userId], references: [id])
+  userId        String
+  fileName      String
+  fileType      String
+  filePath      String
+  generatedQuestionCount Int  @default(0)
+  createdAt     DateTime @default(now())
+}
