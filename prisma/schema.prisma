@@ -32,6 +32,13 @@ enum TestAuthMode {
   exclusiveParticipants
 }
 
+enum ParticipantInvitationStatus {
+  pending
+  accepted
+  declined
+  revoked
+}
+
 
 model Organization {
   id             String      @id @default(uuid())
@@ -93,7 +100,7 @@ model Test {
   timeLimit       Int?
   allowRetakes    Boolean        @default(true)
   shuffleQuestions Boolean       @default(false)
-  isPrivate       Boolean        @default(false)
+  //isPrivate       Boolean        @default(false)
   status          TestStatus     @default(draft)
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
@@ -130,9 +137,16 @@ model Participant {
   fullName       String?
   uniqueId       String?
   registered     Boolean      @default(false)
+  invitationSentAt DateTime?
+  invitationStatus ParticipantInvitationStatus @default(pending)
   responses      Response[]
   createdAt      DateTime     @default(now())
+
+  @@unique([testId, email])
+  @@index([email])
 }
+
+
 
 model Response {
   id             String      @id @default(uuid())
