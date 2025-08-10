@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { QuestionBuilder } from '@/components/test-creation/questionBuilder'
 import { FileUploadQuestions } from '@/components/test-creation/fileUploadQuestions'
-import { Plus, Edit, Trash2, Upload, Users } from 'lucide-react'
+import { Plus, Edit, Trash2, Upload, Users, MessageCircleQuestion } from 'lucide-react'
 import type { QuestionFormData } from '@/lib/validations'
 
 interface QuestionManagementProps {
@@ -45,7 +45,7 @@ export const QuestionManagement = ({
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Users className="w-5 h-5" />
+              <MessageCircleQuestion className="w-5 h-5" />
               Current Questions ({questions.length})
             </CardTitle>
             <CardDescription>
@@ -55,7 +55,7 @@ export const QuestionManagement = ({
           <CardContent>
             <div className="space-y-3">
               {questions.map((question, index) => (
-                <div key={index} className="flex items-center justify-between p-4 border rounded-lg bg-surface">
+                <div key={index} className="flex items-center justify-between p-4 border rounded-lg bg-gray-100  ">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
                       <Badge className={getQuestionTypeColor(question.type)}>
@@ -70,7 +70,7 @@ export const QuestionManagement = ({
                     </div>
                     <p className="text-sm text-foreground">{question.question}</p>
                     {question.correctAnswers && question.correctAnswers.length > 0 && (
-                      <p className="text-xs text-success mt-1">
+                      <p className="text-xs text-success text-green-500 mt-1">
                         Correct: {question.correctAnswers.join(', ')}
                       </p>
                     )}

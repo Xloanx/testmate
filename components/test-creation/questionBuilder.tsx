@@ -176,11 +176,11 @@ export const QuestionBuilder = ({ questions, onQuestionsChange }: QuestionBuilde
                     {question.options.map((option, optionIndex) => (
                       <div key={optionIndex} className="flex items-center gap-2">
                         {question.correctAnswers?.includes(option) ? (
-                          <Check className="w-4 h-4 text-success" />
+                          <Check className="w-4 h-4 text-green-500" />
                         ) : (
                           <X className="w-4 h-4 text-muted-foreground" />
                         )}
-                        <span className={question.correctAnswers?.includes(option) ? 'font-medium text-success' : 'text-muted-foreground'}>
+                        <span className={question.correctAnswers?.includes(option) ? 'font-medium text-green-500' : 'text-muted-foreground'}>
                           {option}
                         </span>
                       </div>
