@@ -11,13 +11,17 @@ export async function GET(
 ) {
   // console.log("[DEBUG] GET /api/tests/:id triggered with params:", params);
   try {
+    const { id } = await params;
     const { userId } = await auth()
+
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const test = await prisma.test.findUnique({
-      where: { id: params.id },
+      where: { id, 
+              creatorId: userId, // Ensure user owns the test
+      },
       include: {
         questions: {
           orderBy: { createdAt: 'asc' },
@@ -38,7 +42,8 @@ export async function GET(
       showResults: test.showResults,
       allowRetakes: test.allowRetakes,
       shuffleQuestions: test.shuffleQuestions,
-      isPrivate: test.isPrivate,
+      createdAt: test.createdAt,
+      updatedAt: test.updatedAt,
       timeLimit: test.timeLimit,
       questions: test.questions.map((q) => ({
         id: q.id,
@@ -57,18 +62,21 @@ export async function GET(
   }
 }
 
+
+
 export async function PUT(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
+    const { id } = await params;
     const { userId } = await auth()
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const test = await prisma.test.findUnique({
-      where: { id: params.id },
+      where: { id },
     })
 
     if (!test || test.creatorId !== userId) {
@@ -79,7 +87,7 @@ export async function PUT(
     const parsed = testUpdateSchema.parse(body)
 
     await prisma.test.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         title: parsed.title,
         description: parsed.description,
@@ -88,7 +96,6 @@ export async function PUT(
         showResults: parsed.settings.showResults,
         allowRetakes: parsed.settings.allowRetakes,
         shuffleQuestions: parsed.settings.shuffleQuestions,
-        isPrivate: parsed.settings.requireAuth,
         timeLimit: parsed.settings.timeLimit,
         updatedAt: new Date(),
       },
@@ -107,6 +114,7 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
+    const { id } = await params;
     const { userId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -114,7 +122,7 @@ export async function DELETE(
 
     // First verify the test exists and belongs to the user
     const test = await prisma.test.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!test || test.creatorId !== userId) {
@@ -128,11 +136,11 @@ export async function DELETE(
     await prisma.$transaction([
       // First delete all questions associated with the test
       prisma.question.deleteMany({
-        where: { testId: params.id },
+        where: { testId: id },
       }),
       // Then delete the test itself
       prisma.test.delete({
-        where: { id: params.id },
+        where: { id: id },
       }),
     ]);
 
@@ -147,3 +155,4 @@ export async function DELETE(
     );
   }
 }
+
