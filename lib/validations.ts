@@ -25,7 +25,7 @@ export const testSettingsSchema = z.object({
   timeLimit: z.number().optional(),
   allowRetakes: z.boolean(),
   shuffleQuestions: z.boolean(),
-  requireAuth: z.boolean(),
+  // requireAuth: z.boolean(),
 })
 
 // Test creation validation schema - questions are now optional
