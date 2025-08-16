@@ -28,8 +28,9 @@ const Dashboard = () => {
     try {
       setLoading(true)
       const res = await fetch('/api/tests', { method: 'GET' })
+      // console.log(res)
+      if (!res.ok) throw new Error(res.error || 'Failed to fetch tests')
       const result = await res.json()
-      if (!result.success) throw new Error(result.error || 'Failed to fetch tests')
       setTests(result.data)
     } catch (err: any) {
       console.error(err)
