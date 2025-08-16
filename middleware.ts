@@ -1,30 +1,42 @@
+// middleware.ts
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
-// import { ensureUserExists } from '@/lib/auth/ensureUserExists';
 import type { NextRequest } from 'next/server';
 
+// Public (anonymous) routes — Clerk won't run auth checks here
 const isPublicRoute = createRouteMatcher([
   '/',
-  '/sign-in',
-  '/sign-up',
-  '/test-home',
+  '/sign-in(.*)',
+  '/sign-up(.*)',
+  '/take-test(.*)', // all /take-test paths stay anonymous
+  '/api/tests/(.*)/take-test', // Public API route for test-taking
+  '/api/tests/(.*)/participants/public', // Public participant creation
+  '/api/tests/(.*)/submit', // Public test submission
+  '/api/tests/:testId/take-test',
 ]);
 
 export default clerkMiddleware(async (auth, req: NextRequest) => {
-  const { userId, redirectToSignIn } = await auth();
-
-  if (!userId && !isPublicRoute(req)) {
-    // Redirect unauthenticated users to sign in
-    return redirectToSignIn();
+  if (isPublicRoute(req)) {
+    return; 
   }
 
+  // Auth applies only for non-public routes
+  const { userId } = await auth();
 
+  if (!userId) {
+    // Redirect unauthenticated users to sign-in
+    const signInUrl = new URL('/', req.url);
+    signInUrl.searchParams.set('redirect_url', req.url);
+    return Response.redirect(signInUrl);
+  }
 });
 
 export const config = {
   matcher: [
-    // Skip Next.js internals and all static files, unless found in search params
-    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
-    // Always run for API routes
-    '/(api|trpc)(.*)',
+    /*
+     * Match all routes except for:
+     * - _next (static files)
+     * - static files like .png, .jpg, .ico, etc.
+     */
+    '/((?!_next|.*\\..*).*)',
   ],
 };
