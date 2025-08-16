@@ -23,20 +23,40 @@ interface Test {
   participant_count?: number
 }
 
+interface Participant {
+  id: string;
+  email: string;
+  fullName?: string;
+  registered: boolean;
+  createdAt: string;
+  responses: {
+    id: string;
+    questionId: string;
+    isCorrect: boolean;
+    submittedAt: string;
+  }[];
+}
+
+
+
+
 const MyTests = () => {
   const router = useRouter()
-  const { isSignedIn } = useUser()
+  const { isSignedIn, isLoaded } = useUser()
   const { tests, setTests, isLoading, setError } = useTestStore()
   const [filteredTests, setFilteredTests] = useState<Test[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
+  const [testAttempts, setTestAttempts] = useState<Participant[]>([]);
 
   useEffect(() => {
+     if (!isLoaded) return;
     if (!isSignedIn) {
       router.push('/')
       return
     }
-    fetchTests()
+    fetchTests();
+    // loadParticipants();
   }, [isSignedIn])
 
 
@@ -54,44 +74,56 @@ const MyTests = () => {
 
 
 
-const fetchTests = async () => {
-  if (!isSignedIn) return;
 
-  try {
-    setLoading(true);
-    const res = await fetch('/api/tests', { method: 'GET' });
-    const result = await res.json();
-    
-    if (!res.ok) {
-      throw new Error(result.error || 'Failed to fetch tests');
+  const fetchTests = async () => {
+    if (!isSignedIn) return;
+
+    try {
+      setLoading(true);
+      const res = await fetch('/api/tests', { method: 'GET' });
+      const result = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(result.error || 'Failed to fetch tests');
+      }
+
+      // Normalize API data into array
+      let testsData: any[] = [];
+      if (Array.isArray(result)) {
+        testsData = result;
+      } else if (Array.isArray(result.data)) {
+        testsData = result.data;
+      } else if (Array.isArray(result.tests)) {
+        testsData = result.tests;
+      }
+      
+      const formattedTests = testsData.map((test: any) => {
+        // This is the logic from loadParticipants:
+        const attempts = (test.participants || []).filter(
+          (p: Participant) => p.responses?.length > 0
+        );
+
+        return {
+          ...test,
+          question_count: test.questions?.length || 0,
+          participant_count: test.participants?.length || 0,
+          attempt_count: test.participants.filter(p => p.responses.length > 0).length
+          // attempts_count: attempts.length, // New field
+          // attempts, // If you also want the actual attempts array
+        };
+      });
+
+      setTests(formattedTests);
+      setFilteredTests(formattedTests);
+    } catch (error: any) {
+      console.error('Error loading tests:', error);
+      setError(error.message);
+      toast.error('Failed to load tests');
+    } finally {
+      setLoading(false);
     }
+  };
 
-    // Ensuring that an array is always returned
-    let testsData = [];
-    if (Array.isArray(result)) {
-      testsData = result;
-    } else if (Array.isArray(result.data)) {
-      testsData = result.data;
-    } else if (Array.isArray(result.tests)) {
-      testsData = result.tests;
-    }
-
-    const formattedTests = testsData.map((test: any) => ({
-      ...test,
-      question_count: test.questions?.length || 0,
-      participant_count: test.test_participants?.length || 0
-    }));
-
-    setTests(formattedTests);
-    setFilteredTests(formattedTests);
-  } catch (error: any) {
-    console.error('Error loading tests:', error);
-    setError(error.message);
-    toast.error('Failed to load tests');
-  } finally {
-    setLoading(false);
-  }
-}
 
   const copyTestId = (testId: string) => {
     navigator.clipboard.writeText(testId)
@@ -119,12 +151,12 @@ const fetchTests = async () => {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'active':
-        return <Badge variant="default" className="bg-success/20 text-success">Active</Badge>
+      case 'published':
+        return <Badge variant="default" className="bg-success/20 bg-green-100 text-green-700">Active</Badge>
       case 'draft':
-        return <Badge variant="secondary">Draft</Badge>
+        return <Badge variant="secondary" className="bg-success/20 bg-yellow-100 text-yellow-700">Draft</Badge>
       case 'archived':
-        return <Badge variant="outline">Archived</Badge>
+        return <Badge variant="outline" className="bg-success/20 bg-gray-100 text-gray-700">Archived</Badge>
       default:
         return <Badge variant="secondary">{status}</Badge>
     }
@@ -224,6 +256,7 @@ const fetchTests = async () => {
                   {test.description && (
                     <CardDescription className="line-clamp-2">{test.description}</CardDescription>
                   )}
+                
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {/* Stats */}
@@ -234,7 +267,7 @@ const fetchTests = async () => {
                     </div>
                     <div className="flex items-center gap-2">
                       <Users className="w-4 h-4 text-primary" />
-                      <span>{test.participant_count} participants</span>
+                      <span>{test.attempt_count > 1? test.attempt_count+" participants" : test.attempt_count+" participant"} </span>
                     </div>
                   </div>
 
@@ -298,7 +331,7 @@ const fetchTests = async () => {
                   <Button
                     size="sm"
                     variant="default"
-                    onClick={() => router.push(`/take-test/${test.id}`)}
+                    onClick={() => router.push(`/test-admin/tests/${test.id}/preview`)}
                     className="w-full"
                   >
                     <Clock className="w-4 h-4 mr-2" />
