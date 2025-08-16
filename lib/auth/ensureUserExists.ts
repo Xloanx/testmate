@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+//consumed by /api/tests/route.ts
 
 export async function ensureUserExists(
   userId: string,
