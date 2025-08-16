@@ -55,7 +55,7 @@ export const TestSettings = ({ settings, onSettingsChange }: TestSettingsProps) 
             </Select>
           </div>
 
-          <div className="flex items-center justify-between">
+          {/* <div className="flex items-center justify-between">
             <div className="space-y-1">
               <Label>Require Authentication</Label>
               <p className="text-sm text-muted-foreground">
@@ -66,7 +66,7 @@ export const TestSettings = ({ settings, onSettingsChange }: TestSettingsProps) 
               checked={settings.requireAuth}
               onCheckedChange={(checked) => updateSetting('requireAuth', checked)}
             />
-          </div>
+          </div> */}
         </CardContent>
       </Card>
 
