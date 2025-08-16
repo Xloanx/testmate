@@ -63,7 +63,11 @@ export async function GET() {
       orderBy: { createdAt: 'desc' },
       include: {
         questions: { select: { id: true } },
-        participants: true
+        participants: {
+          include: {
+            responses: true
+          }
+        }
       }
     })
 
