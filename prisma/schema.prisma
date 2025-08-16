@@ -141,6 +141,7 @@ model Participant {
   invitationStatus ParticipantInvitationStatus @default(pending)
   responses      Response[]
   createdAt      DateTime     @default(now())
+  completedAt    DateTime?
 
   @@unique([testId, email])
   @@index([email])
