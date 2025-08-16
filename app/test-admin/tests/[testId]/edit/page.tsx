@@ -37,17 +37,16 @@ const EditTest = () => {
   const [activeTab, setActiveTab] = useState('info')
 
   const form = useForm<TestCreationFormData>({
-    resolver: zodResolver(testCreationSchema),
+    // resolver: zodResolver(testCreationSchema),
     defaultValues: {
       title: '',
       description: '',
       status: 'draft',
       settings: {
-        authMode: 'free-for-all',
+        authMode: 'freeForAll',
         showResults: 'immediate',
         allowRetakes: false,
         shuffleQuestions: false,
-        requireAuth: false,
       },
       questions: []
     }
@@ -79,7 +78,6 @@ const EditTest = () => {
           showResults: result.showResults,
           allowRetakes: result.allowRetakes,
           shuffleQuestions: result.shuffleQuestions,
-          requireAuth: result.isPrivate,
           timeLimit: result.timeLimit,
         },
         questions: result.questions
@@ -124,7 +122,7 @@ const EditTest = () => {
 
       updateTest(testId, data) // Update store
       toast.success('Test updated successfully!')
-      router.push('/dashboard')
+      router.push(`/test-admin/tests/${testId}/edit`) // Redirect to test details
     } catch (error) {
       console.error('Error updating test:', error)
       toast.error('Failed to update test. Please try again.')
@@ -227,6 +225,9 @@ const EditTest = () => {
                         </FormItem>
                       )}
                     />
+
+
+
 
                     {/* Description */}
                     <FormField
