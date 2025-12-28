@@ -37,10 +37,10 @@ export const HeroSection = () => {
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
             {isSignedIn ? (
               <Button variant="hero" size="xl" asChild>
-                <Link href="/dashboard">Go to Dashboard</Link>
+                <Link href="/test-admin">Go to Dashboard</Link>
               </Button>
             ) : (
-              <SignInButton mode="modal" fallbackRedirectUrl="/dashboard" forceRedirectUrl="/dashboard">
+              <SignInButton mode="modal" fallbackRedirectUrl="/test-admin" forceRedirectUrl="/test-admin">
                 <Button variant="hero" size="xl">
                   Start Creating Tests
                 </Button>
