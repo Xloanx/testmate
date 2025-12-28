@@ -32,17 +32,19 @@ export const testSettingsSchema = z.object({
 export const testCreationSchema = z.object({
   title: z.string().min(1, 'Title is required').max(200, 'Title too long'),
   description: z.string().max(1000, 'Description too long').optional(),
+  passScore: z.number().min(0, 'Pass score cannot be negative').max(100, 'Pass score is rated in percentage'),
+  status: z.enum(['draft', 'published', 'archived']).default('draft'),
   settings: testSettingsSchema,
-  questions: z.array(questionSchema).optional().default([]),
-  status: z.enum(['draft', 'published', 'archived']).default('draft')
 })
 
 
 export const testUpdateSchema = z.object({
   title: z.string().min(1),
   description: z.string().optional(),
+  passScore: z.number().min(0, 'Pass score cannot be negative').max(100, 'Pass score is rated in percentage'),
+  status: z.enum(['draft', 'published', 'archived']).default('draft'),
   settings: testSettingsSchema,
-  status: z.enum(['draft', 'published', 'archived']).default('draft')
+  questions: z.array(questionSchema).optional().default([]),
 })
 
 // File upload schema for AI question generation
