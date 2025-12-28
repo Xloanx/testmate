@@ -1,6 +1,6 @@
 'use client'
-import { useEffect, useState } from 'react'
-import { useAuth, useUser } from '@clerk/nextjs'
+import { useEffect, useState, useCallback } from 'react'
+import { useUser } from '@clerk/nextjs'
 import { useRouter, useParams } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -15,11 +15,13 @@ import { testCreationSchema, type TestCreationFormData } from '@/lib/validations
 import { QuestionManagement } from '@/components/test-creation/questionManagement'
 import { TestSettings } from '@/components/test-creation/testSettings'
 import { toast } from 'sonner'
-import { ArrowLeft, Save, Settings, Users, FileText } from 'lucide-react'
+import { ArrowLeft, Save, Settings, Users, FileText, Eye, BarChart3, RefreshCw } from 'lucide-react'
 import { useTestStore } from '@/stores/useTestStore'
 import QuickActions from '@/components/dashboard/quickActions'
 import { SignOutButton } from '@clerk/nextjs'
 import { LogOut } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Skeleton } from '@/components/ui/skeleton'
 
 const EditTest = () => {
   const { testId } = useParams<{ testId: string }>()
@@ -34,53 +36,50 @@ const EditTest = () => {
     setError 
   } = useTestStore()
   const [isSaving, setIsSaving] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const [activeTab, setActiveTab] = useState('info')
 
   const form = useForm<TestCreationFormData>({
-    // resolver: zodResolver(testCreationSchema),
+    resolver: zodResolver(testCreationSchema),
     defaultValues: {
       title: '',
       description: '',
       status: 'draft',
+      passScore: 50,
       settings: {
         authMode: 'freeForAll',
         showResults: 'immediate',
         allowRetakes: false,
         shuffleQuestions: false,
+        timeLimit: undefined,
       },
       questions: []
     }
   })
 
-  useEffect(() => {
-    if (!isSignedIn) {
-      router.push('/')
-      return
-    }
-    if (testId) loadTest()
-  }, [isSignedIn, testId])
-
-  const loadTest = async () => {
+  const loadTest = useCallback(async () => {
     if (!testId) return
     setLoading(true)
+    setIsRefreshing(true)
     try {
       const response = await fetch(`/api/tests/${testId}`)
       if (!response.ok) throw new Error('Failed to fetch test data')
       const result = await response.json()
-      setCurrentTest(result) // Save in store
+      setCurrentTest(result)
 
       form.reset({
         title: result.title,
-        description: result.description,
+        description: result.description || '',
         status: result.status,
+        passScore: result.passScore || 50,
         settings: {
-          authMode: result.authMode,
-          showResults: result.showResults,
-          allowRetakes: result.allowRetakes,
-          shuffleQuestions: result.shuffleQuestions,
-          timeLimit: result.timeLimit,
+          authMode: result.settings?.authMode || 'freeForAll',
+          showResults: result.settings?.showResults || 'immediate',
+          allowRetakes: result.settings?.allowRetakes || false,
+          shuffleQuestions: result.settings?.shuffleQuestions || false,
+          timeLimit: result.settings?.timeLimit,
         },
-        questions: result.questions
+        questions: result.questions || []
       })
     } catch (error: any) {
       console.error('Error loading test:', error)
@@ -89,57 +88,87 @@ const EditTest = () => {
       router.push('/dashboard')
     } finally {
       setLoading(false)
+      setIsRefreshing(false)
     }
-  }
+  }, [testId, setLoading, setCurrentTest, setError, router, form])
+
+  useEffect(() => {
+    if (!isSignedIn) {
+      router.push('/')
+      return
+    }
+    if (testId) loadTest()
+  }, [isSignedIn, testId, loadTest, router])
 
   const onSubmit = async (data: TestCreationFormData) => {
+    console.log(data)
     if (!user || !testId) return
-    // setLoading(true)
     setIsSaving(true)
 
     try {
-      await fetch(`/api/tests/${testId}`, {
+      // Update test basic info and settings
+      const testResponse = await fetch(`/api/tests/${testId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: data.title,
           description: data.description,
           status: data.status,
+          passScore: data.passScore,
           settings: data.settings,
         })
       })
 
-      if (data.questions?.length > 0) {
-        await fetch('/api/questions', {
-          method: 'POST',
+      if (!testResponse.ok) throw new Error('Failed to update test')
+
+      // Update questions in a single batch
+      if (data.questions && data.questions.length > 0) {
+        const questionsResponse = await fetch(`/api/tests/${testId}/questions`, {
+          method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            testId,
             questions: data.questions
           })
         })
+
+        if (!questionsResponse.ok) throw new Error('Failed to update questions')
       }
 
-      updateTest(testId, data) // Update store
+      updateTest(testId, data)
       toast.success('Test updated successfully!')
-      router.push(`/test-admin/tests/${testId}/edit`) // Redirect to test details
-    } catch (error) {
+      
+      // Optionally redirect or stay on page
+      if (data.status === 'published') {
+        toast.info('Test is now live and accessible to participants')
+      }
+    } catch (error: any) {
       console.error('Error updating test:', error)
-      toast.error('Failed to update test. Please try again.')
+      toast.error(error.message || 'Failed to update test. Please try again.')
     } finally {
-      // setLoading(false)
       setIsSaving(false)
     }
+  }
+
+  const handlePreview = () => {
+    router.push(`/test-admin/tests/${testId}`)
+  }
+
+  const handleViewStats = () => {
+    router.push(`/test-admin/tests/${testId}?tab=stats`)
+  }
+
+  const handleRefresh = () => {
+    loadTest()
   }
 
   if (!isSignedIn) return null
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-subtle flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p>Loading test data...</p>
+      <div className="min-h-screen bg-gradient-subtle">
+        <div className="container mx-auto px-4 py-8">
+          <Skeleton className="h-12 w-1/3 mb-8" />
+          <Skeleton className="h-96 w-full" />
         </div>
       </div>
     )
@@ -150,36 +179,71 @@ const EditTest = () => {
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
-          <div className='flex justify-between items-start'>
-            <Button
-              variant="ghost"
-              onClick={() => router.push('/test-admin')}
-              className="mb-4"
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Dashboard
-            </Button>
-
-            <SignOutButton redirectUrl="/">
-              <Button variant="outline">
-                <LogOut className="w-4 h-4 mr-2" />
-                Sign Out
+          <div className='flex justify-between items-start mb-6'>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => router.push('/test-admin/tests')}
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Tests
               </Button>
-            </SignOutButton>
+              
+              <Button variant="outline" onClick={handleRefresh} disabled={isRefreshing}>
+                <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {currentTest?.status === 'published' && (
+                <>
+                  <Button variant="outline" onClick={handleViewStats}>
+                    <BarChart3 className="w-4 h-4 mr-2" />
+                    View Stats
+                  </Button>
+                  <Button variant="outline" onClick={handlePreview}>
+                    <Eye className="w-4 h-4 mr-2" />
+                    Preview
+                  </Button>
+                </>
+              )}
+              <SignOutButton redirectUrl="/">
+                <Button variant="outline">
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Sign Out
+                </Button>
+              </SignOutButton>
+            </div>
           </div>
 
           <QuickActions />
           
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-12 h-12 rounded-lg bg-blue-400 flex items-center justify-center">
-              <FileText className="w-6 h-6 text-white" />
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-lg bg-blue-400 flex items-center justify-center">
+                <FileText className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold">Edit Test</h1>
+                <p className="text-muted-foreground">
+                  Modify your test settings and questions
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-3xl font-bold">Edit Test</h1>
-              <p className="text-muted-foreground">
-                Modify your test settings and questions
-              </p>
-            </div>
+            
+            {currentTest && (
+              <Badge variant={
+                currentTest.status === 'published' ? 'default' : 
+                currentTest.status === 'draft' ? 'secondary' : 'outline'
+              } className={
+                currentTest.status === 'published' ? 'bg-green-100 text-green-700' :
+                currentTest.status === 'draft' ? 'bg-yellow-100 text-yellow-700' :
+                'bg-gray-100 text-gray-700'
+              }>
+                {currentTest.status}
+              </Badge>
+            )}
           </div>
         </div>
 
@@ -210,24 +274,24 @@ const EditTest = () => {
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
-                    
                     {/* Title */}
                     <FormField
                       control={form.control}
                       name="title"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Test Title</FormLabel>
+                          <FormLabel>Test Title *</FormLabel>
                           <FormControl>
-                            <Input {...field} />
+                            <Input 
+                              {...field} 
+                              placeholder="Enter test title"
+                              disabled={isSaving}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
-
-
-
 
                     {/* Description */}
                     <FormField
@@ -235,11 +299,35 @@ const EditTest = () => {
                       name="description"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Description (Optional)</FormLabel>
+                          <FormLabel>Description</FormLabel>
                           <FormControl>
                             <Textarea 
                               className="min-h-[100px]"
                               {...field} 
+                              placeholder="Describe what this test is about"
+                              disabled={isSaving}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Pass Score */}
+                    <FormField
+                      control={form.control}
+                      name="passScore"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Passing Score (%) *</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="number"
+                              min="0"
+                              max="100"
+                              {...field}
+                              onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                              disabled={isSaving}
                             />
                           </FormControl>
                           <FormMessage />
@@ -257,6 +345,7 @@ const EditTest = () => {
                           <Select 
                             onValueChange={field.onChange} 
                             value={field.value || 'draft'}
+                            disabled={isSaving}
                           >
                             <FormControl>
                               <SelectTrigger className="w-[200px]">
@@ -283,6 +372,8 @@ const EditTest = () => {
                   onQuestionsChange={(questions) => form.setValue('questions', questions)}
                   testId={testId}
                   isEditing={true}
+                  disabled={isSaving}
+                  isDirty={form.formState.isDirty}
                 />
               </TabsContent>
 
@@ -290,30 +381,44 @@ const EditTest = () => {
                 <TestSettings 
                   settings={form.watch('settings')}
                   onSettingsChange={(settings) => form.setValue('settings', settings)}
+                  disabled={isSaving}
                 />
               </TabsContent>
             </Tabs>
 
-            <div className="mt-8 flex justify-end">
-              <Button 
-                type="submit" 
-                // disabled={isLoading}
-                disabled={isSaving}
-                className="bg-blue-400 hover:bg-blue-950 text-white"
-              >
-                {/* {isLoading ? ( */}
-                {isSaving ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Saving Changes...
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4 mr-2" />
-                    Save Changes
-                  </>
-                )}
-              </Button>
+            <div className="mt-8 flex justify-between items-center">
+              <div className="text-sm text-muted-foreground">
+                {form.watch('questions')?.length || 0} questions • 
+                Total points: {form.watch('questions')?.reduce((sum, q) => sum + (q.points || 1), 0) || 0}
+              </div>
+              
+              <div className="flex gap-2">
+                <Button 
+                  type="button" 
+                  variant="outline"
+                  onClick={() => router.push('/test-admin/tests')}
+                  disabled={isSaving}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={isSaving || !form.formState.isDirty}
+                  className="bg-blue-400 hover:bg-blue-950 text-white"
+                >
+                  {isSaving ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 mr-2" />
+                      Save Changes
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           </form>
         </Form>

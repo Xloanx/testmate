@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useUser } from '@clerk/nextjs'
+import { useUser, useAuth } from '@clerk/nextjs'
 import { toast } from 'sonner'
 import { useTestStore } from '@/stores/useTestStore'
 import DashboardHeader from '@/components/dashboard/dashboardHeader'
@@ -14,32 +14,52 @@ import GettingStarted from '@/components/dashboard/gettingStarted'
 const Dashboard = () => {
   const router = useRouter()
   const { isSignedIn } = useUser()
+  const { isLoaded, userId } = useAuth()
   const { tests, setTests, isLoading, setLoading, setError } = useTestStore()
 
   useEffect(() => {
-    if (!isSignedIn) {
-      router.push('/')
-      return
-    }
-    fetchTests()
-  }, [isSignedIn])
+  
+  if (!isLoaded) return
+
+  if (!isSignedIn || !userId) {
+    router.push('/')
+    return
+  }
+
+  fetchTests()
+}, [isLoaded, isSignedIn, userId])
+
+
 
   const fetchTests = async () => {
-    try {
-      setLoading(true)
-      const res = await fetch('/api/tests', { method: 'GET' })
-      // console.log(res)
-      if (!res.ok) throw new Error(res.error || 'Failed to fetch tests')
-      const result = await res.json()
-      setTests(result.data)
-    } catch (err: any) {
-      console.error(err)
-      setError(err.message)
-      toast.error('Failed to load tests')
-    } finally {
-      setLoading(false)
+  try {
+    setLoading(true)
+    const res = await fetch('/api/tests', { method: 'GET' })
+    // console.log(res)
+
+    if (!res.ok) {
+      // Try to parse JSON error if available
+      let errorMessage = 'Failed to fetch tests'
+      try {
+        const errorData = await res.json()
+        errorMessage = errorData.error || errorMessage
+      } catch {
+        // ignore if body can't be parsed
+      }
+      throw new Error(errorMessage)
     }
+
+    const result = await res.json()
+    setTests(result.data)
+  } catch (err: any) {
+    console.error(err)
+    setError(err.message)
+    toast.error('Failed to load tests')
+  } finally {
+    setLoading(false)
   }
+}
+
 
   if (!isSignedIn) return null
   return ( 

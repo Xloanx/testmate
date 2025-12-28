@@ -23,7 +23,6 @@ const CreateTest = () => {
       `Test created successfully! Share this Test ID with participants: ${testId}`
     )
 
-    // router.push(`/test-admin?message=${message}&testId=${testId}`)
     router.push(`/test-admin`)
   }
 

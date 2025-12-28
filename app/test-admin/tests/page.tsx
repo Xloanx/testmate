@@ -37,9 +37,6 @@ interface Participant {
   }[];
 }
 
-
-
-
 const MyTests = () => {
   const router = useRouter()
   const { isSignedIn, isLoaded } = useUser()
@@ -56,7 +53,6 @@ const MyTests = () => {
       return
     }
     fetchTests();
-    // loadParticipants();
   }, [isSignedIn])
 
 
@@ -72,20 +68,17 @@ const MyTests = () => {
     }, [tests, searchTerm])
 
 
-
-
-
   const fetchTests = async () => {
     if (!isSignedIn) return;
 
     try {
       setLoading(true);
       const res = await fetch('/api/tests', { method: 'GET' });
-      const result = await res.json();
-      
       if (!res.ok) {
-        throw new Error(result.error || 'Failed to fetch tests');
+        throw new Error(res.error || 'Failed to fetch tests');
       }
+
+      const result = await res.json();
 
       // Normalize API data into array
       let testsData: any[] = [];
