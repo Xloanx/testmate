@@ -94,21 +94,23 @@ model Test {
   id              String         @id @default(uuid())
   title           String
   description     String?
+  status          TestStatus     @default(draft)
+  passScore       Int
   testCode        String         @unique
   authMode        TestAuthMode   @default(freeForAll)
   showResults     TestShowResults  @default(immediate)
-  timeLimit       Int?
   allowRetakes    Boolean        @default(true)
   shuffleQuestions Boolean       @default(false)
-  //isPrivate       Boolean        @default(false)
-  status          TestStatus     @default(draft)
+  timeLimit       Int?
+  creatorId       String
+  organizationId  String?
+
+
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 
   organization    Organization?  @relation(fields: [organizationId], references: [id])
-  organizationId  String?
   creator         User           @relation("CreatorTests", fields: [creatorId], references: [id])
-  creatorId       String
   questions       Question[]
   participants    Participant[]
 }
