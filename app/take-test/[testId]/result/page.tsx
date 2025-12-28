@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, use  } from 'react';
+import { useEffect, useState  } from 'react';
 import { useParams, useRouter, useSearchParams} from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,11 +8,31 @@ import { toast } from 'sonner';
 import TestResultSummary from '@/components/testResultSummary';
 import { useTestStore } from '@/stores/useTestStore';
 
+
+interface ApiResult {
+  test: any;
+  score: number;
+  totalPoints: number;
+  responses: any[];
+  completedAt: string;
+  metadata: {
+    timeTaken: number | null;
+    completionDate: string;
+    percentage: number;
+    questionsCount: number;
+    correctAnswers: number;
+  };
+}
+
+
 export default function TestResultPage() {
   const { testId } = useParams<{ testId: string }>();
   const searchParams = useSearchParams()
   const participantId = searchParams.get('participantId')
   const router = useRouter();
+
+  const [localLoading, setLocalLoading] = useState(true);
+  const [localResult, setLocalResult] = useState<ApiResult | null>(null);
   
   const {
     currentTest,
@@ -20,66 +40,85 @@ export default function TestResultPage() {
     setCurrentResult,
     isLoading,
     setLoading,
-    score,
+    attempt,
     setScore,
   } = useTestStore();
 
-
+  const score = attempt?.score
 
   useEffect(() => {
-    if (!testId) return;
-
-    let isCancelled = false;
+    if (!testId) {
+      toast.error("Missing test ID");
+      setLocalLoading(false);
+      return;
+    }
 
     const loadResult = async () => {
       setLoading(true);
+      setLocalLoading(true);
+
       try {
         const storedParticipantId = localStorage.getItem(`test_${testId}_participant`);
         const effectiveParticipantId = participantId || storedParticipantId;
         
         if (!effectiveParticipantId) {
           toast.error("Missing participant ID");
+          setLocalLoading(false);
           return;
         }
 
-        const res = await fetch(`/api/tests/${testId}/result?participantId=${effectiveParticipantId}`);
+        console.log("Fetching result for:", { testId, effectiveParticipantId });
+
+        const res = await fetch(
+          `/api/tests/${testId}/result?participantId=${effectiveParticipantId}`,
+          {
+            headers: {
+              'Cache-Control': 'no-cache',
+            },
+          }
+        );
+
         if (!res.ok) {
-          console.log("response: ", res);
+          const errorData = await res.json().catch(() => ({}));
+          console.error("API Error:", res.status, errorData);
+
           if (res.status === 403) {
             toast.error('Results are restricted');
-            // router.replace('/');
-            return;
+          } else if (res.status === 404) {
+            toast.error('Results not found');
+          } else if (res.status === 400) {
+            toast.error('Test not completed yet');
+          } else {
+            throw new Error(`HTTP ${res.status}: ${errorData.error || 'Unknown error'}`);
           }
-          throw new Error(`HTTP ${res.status}`);
+          return;
         }
 
-        const data = await res.json();
-        console.log("data:", data);
-        if (!isCancelled) {
-          setCurrentResult(data);
-          console.log("Current Result:", currentResult);
-          if (typeof data.score === 'number') setScore(data.score);
+        const data: ApiResult = await res.json();
+        console.log("Received result data:", data);
+
+        setLocalResult(data);
+        setCurrentResult(data);
+        if (typeof data.score === 'number') {
+          setScore(data.score);
         }
-        console.log("Score:", score);
+        
       } catch (err) {
         console.error("Error loading results:", err);
-        if (!isCancelled) {
-          toast.error('Failed to load results');
-          // router.replace('/');
-        }
+        toast.error(err instanceof Error ? err.message : 'Failed to load results');
       } finally {
-        if (!isCancelled) setLoading(false);
+        setLoading(false);
+        setLocalLoading(false);
       }
     };
 
     loadResult();
+  }, [testId, participantId, setLoading, setCurrentResult, setScore]);
 
-    return () => {
-      isCancelled = true;
-    };
-  }, [testId, participantId, setLoading, setCurrentResult, setScore, router]);
+  const displayResult = localResult || currentResult;
+  const displayLoading = isLoading || localLoading;
 
-  if (isLoading) {
+  if (displayLoading) {
     return (
       <div className="text-center py-12">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
@@ -88,7 +127,9 @@ export default function TestResultPage() {
     );
   }
 
-  if (!currentResult && score === null) {
+
+
+  if (!displayLoading && !displayResult) {
     return (
       <Card className="max-w-md mx-auto mt-12 shadow-lg border">
         <CardHeader>
@@ -102,10 +143,8 @@ export default function TestResultPage() {
     );
   }
 
-  const finalScore = score ?? currentResult?.score ?? 0;
-  const totalPoints =
-    currentResult?.totalPoints ??
-    (currentTest?.questions?.reduce((sum, q) => sum + (q.points ?? 0), 0) ?? 0);
+  const finalScore = score ?? displayResult?.score ?? 0;
+  const totalPoints = displayResult?.totalPoints ?? 0;
   const percentage = totalPoints > 0 ? Math.round((finalScore / totalPoints) * 100) : 0;
 
   return (
@@ -113,11 +152,11 @@ export default function TestResultPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-2xl">
-            Test Results: {currentResult?.test?.title || "Untitled Test"}
+            Test Results: {displayResult?.test?.title || "Untitled Test"}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-           <TestResultSummary result={currentResult} /> 
+          <TestResultSummary result={displayResult} /> 
           <div className="flex justify-end gap-4 pt-6">
             <Button variant="outline" onClick={() => window.print()}>
               Print Results
