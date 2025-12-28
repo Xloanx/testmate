@@ -6,42 +6,67 @@ const MS_IN_MIN = 60_000;
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   
   try {  
-    const {id : testId}  = await params;
+    const {id : testId}  = params;
+    const participantId = req.nextUrl.searchParams.get('participantId')
 
-    // const participantId = req.nextUrl.searchParams.get('participantId')
-    const url = new URL(req.url)
-    const participantId = url.searchParams.get("participantId")
-
-    console.log("Fetching result for test:", testId, "and participant:", participantId);
+    console.log("participantId: ", participantId, "testId: ", testId);
 
     if (!participantId) {
-      return NextResponse.json({ error: 'Missing participantId' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Missing participantId' }, 
+        { status: 400 }
+      );
     }
 
-    // Ensure participant belongs to this test
-    const result = await prisma.participant.findFirst({
-      where: { id: participantId, testId },
+    if (!testId) {
+      return NextResponse.json(
+        { error: 'Missing testId' }, 
+        { status: 400 }
+      );
+    }
+
+    // First verify the participant exists and belongs to this test
+    const participant = await prisma.participant.findUnique({
+      where: { 
+        id: participantId,
+        testId: testId 
+      },
+    });
+
+    if (!participant) {
+      console.log("Participant not found or doesn't belong to test");
+      return NextResponse.json({ error: 'Participant not found' }, { status: 404 });
+    }
+
+    // Now fetch the complete result with relationships
+    const result = await prisma.participant.findUnique({
+      where: { id: participantId },
       include: {
         responses: {
-          include: { question: true },
+          include: { 
+            question: true 
+          },
           orderBy: { question: { orderIndex: 'asc' } },
         },
         test: {
-          select: {
-            title: true,
-            description: true,
-            questions: { orderBy: { orderIndex: 'asc' } },
-            createdAt: true,
-            timeLimit: true,
+          include: {
+            questions: { 
+              orderBy: { orderIndex: 'asc' } 
+            },
           },
         },
       },
     });
 
-    // console.log("result: ", result);
 
     if (!result) {
+      console.log("Result not found");
       return NextResponse.json({ error: 'Result not found' }, { status: 404 });
+    }
+
+    if (!result.completedAt) {
+      console.log("Test not completed yet");
+      return NextResponse.json({ error: 'Test not completed' }, { status: 400 });
     }
 
     const timeTaken =
@@ -55,39 +80,45 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       0
     );
 
-    const headers = {
-      'Cache-Control': 'public, max-age=3600, stale-while-revalidate=1800',
-    };
+    console.log("result: ", result,
+      "score: ", score,
+      "totalPoints: ", totalPoints,
+      "timeTaken: ", timeTaken,
+    );
 
-    // console.log("Result summary:", {
-    //   testId,
-    //   participantId,
-    //   score,
-    //   totalPoints,
-    //   timeTaken,
-    //   completedAt: result.completedAt,
-    //   responsesCount: result.responses.length,
+    // const headers = ({
+    //   'Cache-Control': 'public, max-age=3600, stale-while-revalidate=1800',
     // });
 
-    return NextResponse.json(
-      {
-        test: result.test,
-        score,
-        totalPoints,
-        responses: result.responses,
-        completedAt: result.completedAt,
-        metadata: {
-          timeTaken,
-          completionDate: result.completedAt,
-          percentage: totalPoints > 0 ? Math.round((score / totalPoints) * 100) : 0,
-          questionsCount: result.test.questions.length,
-          correctAnswers: result.responses.filter(r => r.isCorrect).length,
-        },
+  
+
+    return NextResponse.json({
+      test: {
+        id: result.test.id,
+        title: result.test.title,
+        passScore: result.test.passScore,
+        description: result.test.description,
+        questions: result.test.questions,
+        createdAt: result.test.createdAt,
+        timeLimit: result.test.timeLimit,
       },
-      { status: 200, headers }
-    );
+      score,
+      totalPoints,
+      responses: result.responses,
+      completedAt: result.completedAt,
+      metadata: {
+        timeTaken,
+        completionDate: result.completedAt,
+        percentage: totalPoints > 0 ? Math.round((score / totalPoints) * 100) : 0,
+        questionsCount: result.test.questions.length,
+        correctAnswers: result.responses.filter(r => r.isCorrect).length,
+      },
+    });
   } catch (err) {
     console.error("Error fetching test result:", err);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Internal Server Error', details: err instanceof Error ? err.message : 'Unknown error' }, 
+      { status: 500 }
+    );
   }
 }

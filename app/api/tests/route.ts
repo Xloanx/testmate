@@ -6,11 +6,10 @@ import { ensureUserExists } from '@/lib/auth/ensureUserExists';
 
 export async function POST(req: Request) {
   try {
+    const user = await currentUser()
     const body = await req.json()
-    const parsed = testCreationSchema.omit({ questions: true }).parse(body) // exclude questions
-
-    const user = await currentUser();
-
+    // const parsed = testCreationSchema.omit({ questions: true }).parse(body) // exclude questions
+    const parsed = testCreationSchema.parse(body)
     const { id: userId, emailAddresses, firstName, lastName } = user;
     const email = emailAddresses[0]?.emailAddress;
 
@@ -26,6 +25,7 @@ export async function POST(req: Request) {
       data: {
         title: parsed.title,
         description: parsed.description,
+        passScore: parsed.passScore,
         testCode,
         creatorId: userId,
         authMode: parsed.settings.authMode,
@@ -33,7 +33,7 @@ export async function POST(req: Request) {
         timeLimit: parsed.settings.timeLimit,
         allowRetakes: parsed.settings.allowRetakes,
         shuffleQuestions: parsed.settings.shuffleQuestions,
-        isPrivate: parsed.settings.requireAuth,
+        // isPrivate: parsed.settings.requireAuth,
       },
     })
 
@@ -48,13 +48,17 @@ export async function POST(req: Request) {
 
 export async function GET() {
   try {
+    // Ensure user is authenticated
     const user = await currentUser()
     if (!user) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401 }
+      )
     }
-
+    // Ensure user exists in the database
     const { id: userId, emailAddresses, firstName, lastName } = user
-    const email = emailAddresses[0]?.emailAddress
+    const email = emailAddresses[0]?.emailAddress ?? ""
 
     await ensureUserExists(userId, email, firstName, lastName)
 
@@ -83,3 +87,4 @@ export async function GET() {
     return NextResponse.json({ success: false, error: err.message || 'Something went wrong' }, { status: 500 })
   }
 }
+

@@ -14,6 +14,6 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       registered: false
     }
   })
-  console.log("first participant created", participant)
+  // console.log("first participant created", participant)
   return NextResponse.json({ participantId: participant.id })
 }

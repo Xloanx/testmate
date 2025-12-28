@@ -32,7 +32,7 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     });
 
 
-    if (!test) {
+    if (!test || test.status === "draft" || test.status === "archived") {
       console.warn(`Test not found: ${testId}`)
       return NextResponse.json({ error: "Test not found" }, { status: 404 })
     }

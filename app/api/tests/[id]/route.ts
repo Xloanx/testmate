@@ -38,22 +38,28 @@ export async function GET(
       title: test.title,
       description: test.description,
       status: test.status,
-      authMode: test.authMode,
-      showResults: test.showResults,
-      allowRetakes: test.allowRetakes,
-      shuffleQuestions: test.shuffleQuestions,
+      passScore: test.passScore || 50, // Default value if missing
+      organizationId: test.organizationId || "", // Default value
+      createdBy: test.creatorId, // Map creatorId to createdBy
+      participants: [], // Empty array if not available
       createdAt: test.createdAt,
       updatedAt: test.updatedAt,
-      timeLimit: test.timeLimit,
+      // Nest settings under settings object as expected by store
+      settings: {
+        authMode: test.authMode,
+        showResults: test.showResults,
+        allowRetakes: test.allowRetakes,
+        shuffleQuestions: test.shuffleQuestions,
+        timeLimit: test.timeLimit,
+      },
       questions: test.questions.map((q) => ({
         id: q.id,
         type: q.type,
         question: q.question,
-        options: q.options || [],
-        correctAnswers: q.correctAnswers || [],
+        options: Array.isArray(q.options) ? q.options : [],
+        correctAnswers: Array.isArray(q.correctAnswers) ? q.correctAnswers : [],
         points: q.points,
         timeLimit: q.timeLimit,
-        visibility: q.visibility || {},
       })),
     })
   } catch (err: any) {
@@ -92,6 +98,7 @@ export async function PUT(
         title: parsed.title,
         description: parsed.description,
         status: parsed.status,
+        passScore: parsed.passScore,
         authMode: parsed.settings.authMode,
         showResults: parsed.settings.showResults,
         allowRetakes: parsed.settings.allowRetakes,
