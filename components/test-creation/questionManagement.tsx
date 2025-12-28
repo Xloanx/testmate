@@ -13,13 +13,17 @@ interface QuestionManagementProps {
   onQuestionsChange: (questions: QuestionFormData[]) => void
   testId?: string
   isEditing?: boolean
+  disabled?: boolean   
+  isDirty?: boolean 
 }
 
 export const QuestionManagement = ({ 
   questions, 
   onQuestionsChange,
   testId,
-  isEditing = false 
+  isEditing = false,
+  disabled = false,
+  isDirty = false 
 }: QuestionManagementProps) => {
   const [activeTab, setActiveTab] = useState('manual')
 
@@ -40,6 +44,13 @@ export const QuestionManagement = ({
 
   return (
     <div className="space-y-6">
+
+      {isEditing && (
+        <p className="text-sm text-muted-foreground">
+          {isDirty ? "You have unsaved changes" : "All changes saved"}
+        </p>
+      )}
+
       {/* Questions Overview */}
       {questions.length > 0 && (
         <Card>
@@ -76,7 +87,7 @@ export const QuestionManagement = ({
                     )}
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm">
+                    <Button variant="outline" size="sm" disabled={disabled}>
                       <Edit className="w-4 h-4" />
                     </Button>
                     <Button 
@@ -84,6 +95,7 @@ export const QuestionManagement = ({
                       size="sm" 
                       onClick={() => removeQuestion(index)}
                       className="text-destructive hover:text-destructive"
+                      disabled={disabled}
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>

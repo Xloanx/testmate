@@ -28,13 +28,14 @@ export const TestCreationForm = ({ onTestCreated }: TestCreationFormProps) => {
     resolver: zodResolver(testCreationSchema),
     defaultValues: {
       title: '',
+      passScore: 50, // Default pass score
       description: '',
       settings: {
         authMode: 'freeForAll',
         showResults: 'immediate',
         allowRetakes: false,
         shuffleQuestions: false,
-        requireAuth: false,
+        // requireAuth: false,
       },
       questions: []
     }
@@ -160,6 +161,28 @@ export const TestCreationForm = ({ onTestCreated }: TestCreationFormProps) => {
                   )}
                 />
 
+                {/* Pass Score */}
+                    <FormField
+                      control={form.control}
+                      name="passScore"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Pass Score (%)</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              placeholder="Enter pass percentage" 
+                              min={0} 
+                              max={100} 
+                              {...field} 
+                              onChange={(e) => field.onChange(Number(e.target.value))} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
                 <FormField
                   control={form.control}
                   name="description"
@@ -283,13 +306,6 @@ export const TestCreationForm = ({ onTestCreated }: TestCreationFormProps) => {
                   >
                     {loading ? 'Creating Test...' : 'Create Test'}
                   </Button>
-                  {/* <button
-                    type="submit"
-                    disabled={loading}
-                    className="bg-blue-400 hover:bg-blue-950 text-white px-4 py-2 rounded"
-                  >
-                    {loading ? 'Creating Test...' : 'Create Test'}
-                  </button> */}
                 </div>
               </CardContent>
             </Card>
